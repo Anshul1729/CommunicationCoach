@@ -80,6 +80,14 @@ class AnalysisWorker(
                 return Result.success()
             }
 
+            val costTracker = CostTracker(applicationContext)
+            if (costTracker.getTotalUsd() >= CostTracker.SPEND_LIMIT_USD) {
+                Log.w(TAG, "Spend limit reached (\$${CostTracker.SPEND_LIMIT_USD}) — skipping analysis")
+                db.conversationDao().updateStatus(conversationId, ConversationStatus.ANALYZED)
+                sendLimitNotification()
+                return Result.success()
+            }
+
             val profileJson = db.userProfileDao().get()?.profileJson ?: "{}"
 
             val apiClient = ApiClient(applicationContext)
@@ -126,8 +134,7 @@ class AnalysisWorker(
 
             db.conversationDao().updateStatus(conversationId, ConversationStatus.ANALYZED)
 
-            // Track costs
-            val costTracker = CostTracker(applicationContext)
+            // Track costs (costTracker already created above for spend-limit check)
             val conversation = db.conversationDao().getById(conversationId)
             if (conversation != null) {
                 costTracker.addSpeechCost(conversation.durationSeconds)
@@ -206,5 +213,30 @@ class AnalysisWorker(
 
         notificationManager.notify(COACHING_NOTIF_ID, notif)
         Log.d(TAG, "Coaching notification sent")
+    }
+
+    /** Notifies the user that the spend limit has been reached and analysis is paused. */
+    private fun sendLimitNotification() {
+        val notificationManager =
+            applicationContext.getSystemService(NotificationManager::class.java)
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val channel = NotificationChannel(
+                COACHING_CHANNEL_ID,
+                "Coaching Insights",
+                NotificationManager.IMPORTANCE_DEFAULT
+            ).apply { description = "Post-conversation coaching tips" }
+            notificationManager.createNotificationChannel(channel)
+        }
+
+        val notif = NotificationCompat.Builder(applicationContext, COACHING_CHANNEL_ID)
+            .setSmallIcon(android.R.drawable.ic_dialog_info)
+            .setContentTitle("Spend limit reached")
+            .setContentText("API budget of \$${CostTracker.SPEND_LIMIT_USD} used. Coaching analysis paused.")
+            .setAutoCancel(true)
+            .build()
+
+        notificationManager.notify(COACHING_NOTIF_ID + 1, notif)
+        Log.w(TAG, "Spend limit notification sent")
     }
 }

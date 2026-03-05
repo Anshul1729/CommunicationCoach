@@ -7,6 +7,11 @@ class CostTracker(context: Context) {
     private val prefs = context.getSharedPreferences("cost_tracker", Context.MODE_PRIVATE)
 
     companion object {
+        // ── Spend limit ───────────────────────────────────────────────────────
+        // Set to Double.MAX_VALUE for owner build (no limit).
+        // Set to 2.0 for friend/guest build ($2 cap).
+        const val SPEND_LIMIT_USD = Double.MAX_VALUE
+
         // Google Cloud Speech-to-Text: latest_long model — $0.006 per 15-second block
         private const val STT_COST_PER_15S = 0.006
 
