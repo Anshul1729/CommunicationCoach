@@ -1,0 +1,7 @@
+# API Keys for Communication Coach
+# Get your keys from:
+# - Whisper: https://platform.openai.com/api-keys
+# - Claude: https://console.anthropic.com/settings/keys
+
+whisperApiKey=YOUR_WHISPER_API_KEY_HERE
+claudeApiKey=YOUR_CLAUDE_API_KEY_HERE

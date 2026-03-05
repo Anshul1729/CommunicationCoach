@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Communication Coach</string>
+    <string name="start_recording">Start Coaching Session</string>
+    <string name="stop_recording">Stop Session</string>
+    <string name="session_active">Session Active</string>
+    <string name="session_stopped">Session Stopped</string>
+    <string name="notification_channel_name">Recording Service</string>
+    <string name="notification_channel_description">Shows when microphone is actively recording</string>
+    <string name="notification_title">Communication Coach Active</string>
+    <string name="notification_text">Listening to your conversation…</string>
+    <string name="api_key_missing">API keys not configured. Please add them to local.properties</string>
+</resources>
