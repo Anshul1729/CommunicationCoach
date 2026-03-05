@@ -3,6 +3,7 @@ package com.communicationcoach.data.api
 import android.content.Context
 import android.util.Base64
 import android.util.Log
+import com.communicationcoach.BuildConfig
 import com.communicationcoach.data.model.GeminiContent
 import com.communicationcoach.data.model.GeminiGenerationConfig
 import com.communicationcoach.data.model.GeminiPart
@@ -23,6 +24,11 @@ import java.util.concurrent.TimeUnit
 class ApiClient(context: Context) {
 
     private val authHelper = GoogleAuthHelper(context)
+
+    private val vertexUrl =
+        "https://${BuildConfig.VERTEX_REGION}-aiplatform.googleapis.com/" +
+        "v1/projects/${BuildConfig.GCP_PROJECT_ID}/locations/${BuildConfig.VERTEX_REGION}/" +
+        "publishers/google/models/${BuildConfig.GEMINI_MODEL}:generateContent"
 
     private val okHttpClient = OkHttpClient.Builder()
         .addInterceptor(HttpLoggingInterceptor().apply {
@@ -80,6 +86,7 @@ class ApiClient(context: Context) {
         val token = authHelper.getAccessToken()
         val prompt = buildConversationPrompt(fullTranscript, userProfileJson)
         return vertexService.generate(
+            vertexUrl,
             "Bearer $token",
             GeminiRequest(
                 contents = listOf(GeminiContent("user", listOf(GeminiPart(prompt)))),
@@ -97,6 +104,7 @@ class ApiClient(context: Context) {
         val token = authHelper.getAccessToken()
         val prompt = buildDigestPrompt(insightSummaries, userProfileJson)
         return vertexService.generate(
+            vertexUrl,
             "Bearer $token",
             GeminiRequest(
                 contents = listOf(GeminiContent("user", listOf(GeminiPart(prompt)))),

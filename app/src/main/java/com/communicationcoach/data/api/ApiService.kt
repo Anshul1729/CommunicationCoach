@@ -8,6 +8,7 @@ import retrofit2.Response
 import retrofit2.http.Body
 import retrofit2.http.Header
 import retrofit2.http.POST
+import retrofit2.http.Url
 
 interface SpeechToTextApiService {
     @POST("v1p1beta1/speech:recognize")
@@ -18,8 +19,9 @@ interface SpeechToTextApiService {
 }
 
 interface VertexAiApiService {
-    @POST("v1/projects/op-d2r/locations/us-central1/publishers/google/models/gemini-2.5-flash:generateContent")
+    @POST
     suspend fun generate(
+        @Url url: String,
         @Header("Authorization") auth: String,
         @Body request: GeminiRequest
     ): Response<GeminiResponse>

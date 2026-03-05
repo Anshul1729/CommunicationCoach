@@ -1,7 +1,14 @@
+import java.util.Properties
+
 plugins {
     id("com.android.application")
     id("kotlin-android")
     id("kotlin-kapt")
+}
+
+val localProps = Properties().apply {
+    val f = rootProject.file("local.properties")
+    if (f.exists()) load(f.inputStream())
 }
 
 android {
@@ -16,6 +23,10 @@ android {
         versionName = "1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+
+        buildConfigField("String", "GCP_PROJECT_ID", "\"${localProps.getProperty("GCP_PROJECT_ID", "")}\"")
+        buildConfigField("String", "VERTEX_REGION",  "\"${localProps.getProperty("VERTEX_REGION",  "us-central1")}\"")
+        buildConfigField("String", "GEMINI_MODEL",   "\"${localProps.getProperty("GEMINI_MODEL",   "gemini-2.5-flash")}\"")
     }
 
     buildTypes {

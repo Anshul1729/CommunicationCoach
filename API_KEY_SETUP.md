@@ -1,86 +1,33 @@
-# Communication Coach - API Key Setup
+# Setup Guide
 
-## Required API Keys
+This app uses **Google Cloud Vertex AI** (Gemini 2.5 Flash) and **Google Cloud Speech-to-Text**.
+Both are accessed via a single GCP service account — no separate API keys needed.
 
-You need two API keys to run this app:
+## Steps
 
-### 1. OpenAI Whisper API Key
+### 1. Create a GCP Service Account
+1. Go to [Google Cloud Console](https://console.cloud.google.com/) → IAM & Admin → Service Accounts
+2. Create a service account with these roles:
+   - `Cloud Speech-to-Text User`
+   - `Vertex AI User`
+3. Create a JSON key and download it
 
-**Get it here:** https://platform.openai.com/api-keys
+### 2. Add the service account file
+Place the downloaded JSON file at:
+```
+app/src/main/res/raw/service_account.json
+```
+Use `service_account_template.json` at the project root as a reference for the expected format.
 
-1. Sign up / Log in to OpenAI
-2. Go to API Keys section
-3. Create a new secret key
-4. Copy the key (starts with `sk-...`)
-
-### 2. Anthropic Claude API Key
-
-**Get it here:** https://console.anthropic.com/settings/keys
-
-1. Sign up / Log in to Anthropic
-2. Go to Settings → API Keys
-3. Create a new key
-4. Copy the key (starts with `sk-ant-...`)
-
-## Where to Add Keys
-
-### Option 1: In local.properties (Recommended)
-
-Create `local.properties` in project root:
-
+### 3. Configure local.properties
+Copy `local.properties.template` to `local.properties` and fill in your values:
 ```properties
-whisperApiKey=sk-your-openai-key-here
-claudeApiKey=sk-ant-your-anthropic-key-here
+sdk.dir=/path/to/your/Android/sdk
+GCP_PROJECT_ID=your-gcp-project-id
+VERTEX_REGION=us-central1
+GEMINI_MODEL=gemini-2.5-flash
 ```
 
-Then update `RecordingForegroundService.kt`:
-
-```kotlin
-// Load from BuildConfig or hardcode for MVP
-const val WHISPER_API_KEY = "sk-your-openai-key-here"
-const val CLAUDE_API_KEY = "sk-ant-your-anthropic-key-here"
-```
-
-### Option 2: Direct in RecordingForegroundService.kt
-
-Open `app/src/main/java/com/communicationcoach/service/RecordingForegroundService.kt`
-
-Find these lines (around line 27-28):
-
-```kotlin
-const val WHISPER_API_KEY = "YOUR_WHISPER_API_KEY"
-const val CLAUDE_API_KEY = "YOUR_CLAUDE_API_KEY"
-```
-
-Replace with your actual keys.
-
-## Security Note
-
-⚠️ **Never commit API keys to version control!**
-
-The `local.properties` file should be in your `.gitignore`.
-
-For production, use:
-- Android Keystore for key encryption
-- BuildConfig with secret management
-- Environment variables in CI/CD
-
-## Testing Your Keys
-
-After adding keys, test them:
-
-1. Build and run the app
-2. Start a recording session
-3. Speak for 30 seconds
-4. Check LogCat for:
-   - "Transcript: ..." (Whisper working)
-   - "Analysis: ..." (Claude working)
-   - "Nudge triggered for: ..." (Vibration working)
-
-## Cost Monitoring
-
-Monitor your API usage:
-- OpenAI: https://platform.openai.com/usage
-- Anthropic: https://console.anthropic.com/settings/billing
-
-Expected cost: **$1-4/day** for 4-6 hours of usage.
+### 4. Enable APIs in GCP Console
+- [Cloud Speech-to-Text API](https://console.cloud.google.com/apis/library/speech.googleapis.com)
+- [Vertex AI API](https://console.cloud.google.com/apis/library/aiplatform.googleapis.com)
