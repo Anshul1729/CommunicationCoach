@@ -24,9 +24,9 @@ android {
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
-        buildConfigField("String", "GCP_PROJECT_ID", "\"${localProps.getProperty("GCP_PROJECT_ID", "")}\"")
-        buildConfigField("String", "VERTEX_REGION",  "\"${localProps.getProperty("VERTEX_REGION",  "us-central1")}\"")
-        buildConfigField("String", "GEMINI_MODEL",   "\"${localProps.getProperty("GEMINI_MODEL",   "gemini-2.5-flash")}\"")
+        buildConfigField("String", "WORKER_URL", "\"${localProps.getProperty("WORKER_URL", "")}\"")
+        buildConfigField("String", "APP_TOKEN",  "\"${localProps.getProperty("APP_TOKEN",  "")}\"")
+
     }
 
     buildTypes {

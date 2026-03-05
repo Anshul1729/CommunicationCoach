@@ -4,15 +4,10 @@ import android.content.Context
 import android.util.Base64
 import android.util.Log
 import com.communicationcoach.BuildConfig
-import com.communicationcoach.data.model.GeminiContent
-import com.communicationcoach.data.model.GeminiGenerationConfig
-import com.communicationcoach.data.model.GeminiPart
-import com.communicationcoach.data.model.GeminiRequest
 import com.communicationcoach.data.model.GeminiResponse
-import com.communicationcoach.data.model.SpeechAudio
-import com.communicationcoach.data.model.SpeechConfig
-import com.communicationcoach.data.model.SpeechRequest
 import com.communicationcoach.data.model.SpeechResponse
+import com.communicationcoach.data.model.WorkerGeminiRequest
+import com.communicationcoach.data.model.WorkerTranscribeRequest
 import okhttp3.OkHttpClient
 import okhttp3.logging.HttpLoggingInterceptor
 import retrofit2.Response
@@ -23,58 +18,31 @@ import java.util.concurrent.TimeUnit
 
 class ApiClient(context: Context) {
 
-    private val authHelper = GoogleAuthHelper(context)
+    private val auth = "Bearer ${BuildConfig.APP_TOKEN}"
 
-    private val vertexUrl =
-        "https://${BuildConfig.VERTEX_REGION}-aiplatform.googleapis.com/" +
-        "v1/projects/${BuildConfig.GCP_PROJECT_ID}/locations/${BuildConfig.VERTEX_REGION}/" +
-        "publishers/google/models/${BuildConfig.GEMINI_MODEL}:generateContent"
-
-    private val okHttpClient = OkHttpClient.Builder()
-        .addInterceptor(HttpLoggingInterceptor().apply {
-            level = HttpLoggingInterceptor.Level.HEADERS
-        })
-        .connectTimeout(30, TimeUnit.SECONDS)
-        .readTimeout(60, TimeUnit.SECONDS)
-        .writeTimeout(60, TimeUnit.SECONDS)
-        .build()
-
-    private val speechService = Retrofit.Builder()
-        .baseUrl("https://speech.googleapis.com/")
-        .client(okHttpClient)
+    private val workerService = Retrofit.Builder()
+        .baseUrl(BuildConfig.WORKER_URL.trimEnd('/') + "/")
+        .client(
+            OkHttpClient.Builder()
+                .addInterceptor(HttpLoggingInterceptor().apply {
+                    level = HttpLoggingInterceptor.Level.HEADERS
+                })
+                .connectTimeout(30, TimeUnit.SECONDS)
+                .readTimeout(60, TimeUnit.SECONDS)
+                .writeTimeout(60, TimeUnit.SECONDS)
+                .build()
+        )
         .addConverterFactory(GsonConverterFactory.create())
         .build()
-        .create(SpeechToTextApiService::class.java)
-
-    private val vertexService = Retrofit.Builder()
-        .baseUrl("https://us-central1-aiplatform.googleapis.com/")
-        .client(okHttpClient)
-        .addConverterFactory(GsonConverterFactory.create())
-        .build()
-        .create(VertexAiApiService::class.java)
+        .create(WorkerApiService::class.java)
 
     // ── Transcription ─────────────────────────────────────────────────────────
 
     suspend fun transcribeAudio(file: File): Response<SpeechResponse> {
-        val token = authHelper.getAccessToken()
-
         // Strip 44-byte WAV header → raw LINEAR16 PCM
         val pcmBytes = file.readBytes().drop(44).toByteArray()
         val base64Audio = Base64.encodeToString(pcmBytes, Base64.NO_WRAP)
-
-        val request = SpeechRequest(
-            config = SpeechConfig(
-                encoding = "LINEAR16",
-                sampleRateHertz = 16000,
-                languageCode = "en-IN",
-                alternativeLanguageCodes = listOf("hi-IN"),
-                model = "latest_long",
-                enableAutomaticPunctuation = true
-            ),
-            audio = SpeechAudio(content = base64Audio)
-        )
-
-        return speechService.recognize("Bearer $token", request)
+        return workerService.transcribe(auth, WorkerTranscribeRequest(audio = base64Audio))
     }
 
     // ── Conversation analysis ─────────────────────────────────────────────────
@@ -83,14 +51,11 @@ class ApiClient(context: Context) {
         fullTranscript: String,
         userProfileJson: String
     ): Response<GeminiResponse> {
-        val token = authHelper.getAccessToken()
-        val prompt = buildConversationPrompt(fullTranscript, userProfileJson)
-        return vertexService.generate(
-            vertexUrl,
-            "Bearer $token",
-            GeminiRequest(
-                contents = listOf(GeminiContent("user", listOf(GeminiPart(prompt)))),
-                generationConfig = GeminiGenerationConfig(maxOutputTokens = 4096)
+        return workerService.gemini(
+            auth,
+            WorkerGeminiRequest(
+                prompt = buildConversationPrompt(fullTranscript, userProfileJson),
+                maxTokens = 4096
             )
         )
     }
@@ -101,14 +66,11 @@ class ApiClient(context: Context) {
         insightSummaries: String,
         userProfileJson: String
     ): Response<GeminiResponse> {
-        val token = authHelper.getAccessToken()
-        val prompt = buildDigestPrompt(insightSummaries, userProfileJson)
-        return vertexService.generate(
-            vertexUrl,
-            "Bearer $token",
-            GeminiRequest(
-                contents = listOf(GeminiContent("user", listOf(GeminiPart(prompt)))),
-                generationConfig = GeminiGenerationConfig(maxOutputTokens = 1024)
+        return workerService.gemini(
+            auth,
+            WorkerGeminiRequest(
+                prompt = buildDigestPrompt(insightSummaries, userProfileJson),
+                maxTokens = 1024
             )
         )
     }
@@ -177,11 +139,9 @@ class ApiClient(context: Context) {
     companion object {
         private const val TAG = "ApiClient"
 
-        // Extract text from Gemini response
         fun extractText(response: GeminiResponse): String? =
             response.candidates?.firstOrNull()?.content?.parts?.firstOrNull()?.text
 
-        // Strip markdown code fences Gemini sometimes wraps JSON in (```json ... ```)
         fun cleanJson(raw: String): String {
             val trimmed = raw.trim()
             return when {

@@ -3,6 +3,11 @@ package com.communicationcoach.data.model
 import com.google.gson.annotations.SerializedName
 import java.io.File
 
+// ── Cloudflare Worker requests ────────────────────────────────────────────────
+
+data class WorkerTranscribeRequest(val audio: String)
+data class WorkerGeminiRequest(val prompt: String, val maxTokens: Int)
+
 // ── Google Speech-to-Text ─────────────────────────────────────────────────────
 
 data class SpeechRequest(
