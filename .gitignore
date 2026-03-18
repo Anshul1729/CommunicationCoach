@@ -14,5 +14,5 @@ local.properties
 **/local.properties
 **/secrets.properties
 
-# Google Cloud service account credentials — NEVER commit
+# Credentials — NEVER commit
 **/res/raw/service_account.json

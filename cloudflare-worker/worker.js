@@ -1,20 +1,20 @@
 /**
  * Communication Coach — Cloudflare Worker proxy
  *
- * Holds GCP credentials as Worker Secrets (never in the APK).
+ * Holds the Groq API key as a Worker Secret (never in the APK).
  * The Android app authenticates with a simple APP_TOKEN bearer token.
  *
  * Secrets to set via `wrangler secret put`:
- *   SERVICE_ACCOUNT_JSON  — full content of your GCP service account JSON
- *   APP_TOKEN             — any random string (e.g. openssl rand -hex 32)
+ *   GROQ_API_KEY  — your Groq API key (from console.groq.com)
+ *   APP_TOKEN     — any random string (e.g. openssl rand -hex 32)
  *
  * Endpoints:
- *   POST /transcribe  { audio: "<base64 raw PCM>" }
+ *   POST /transcribe  { audio: "<base64 WAV bytes>" }
  *   POST /gemini      { prompt: "...", maxTokens: 4096 }
+ *
+ * Responses are shaped to match the existing Android model classes
+ * (GeminiResponse / SpeechResponse) so the app code is unchanged.
  */
-
-let _gcpToken = null;
-let _gcpTokenExpiry = 0;
 
 export default {
   async fetch(request, env) {
@@ -27,9 +27,8 @@ export default {
     const body = await request.json().catch(() => ({}));
 
     try {
-      const gcpToken = await getGcpToken(env);
-      if (path === '/transcribe') return await transcribe(body, gcpToken);
-      if (path === '/gemini')     return await gemini(body, gcpToken, env);
+      if (path === '/transcribe') return await transcribe(body, env.GROQ_API_KEY);
+      if (path === '/gemini')     return await chat(body, env.GROQ_API_KEY);
       return new Response('Not found', { status: 404 });
     } catch (err) {
       return new Response(JSON.stringify({ error: err.message }), {
@@ -40,120 +39,78 @@ export default {
   },
 };
 
-// ── GCP OAuth2 token (module-level cache, ~1 hour) ────────────────────────────
+// ── Transcription (Groq Whisper) ──────────────────────────────────────────────
 
-async function getGcpToken(env) {
-  const now = Math.floor(Date.now() / 1000);
-  if (_gcpToken && now < _gcpTokenExpiry - 60) return _gcpToken;
+async function transcribe(body, groqApiKey) {
+  // body.audio is base64-encoded full WAV (including header)
+  const wavBytes = base64ToBytes(body.audio);
 
-  const sa  = JSON.parse(env.SERVICE_ACCOUNT_JSON);
-  const jwt = await buildJwt(sa.client_email, sa.private_key, now);
+  const formData = new FormData();
+  formData.append('file', new Blob([wavBytes], { type: 'audio/wav' }), 'audio.wav');
+  formData.append('model', 'whisper-large-v3');
+  // Omit language for auto-detection (handles English / Hindi / Hinglish)
+  formData.append('prompt', 'Conversation in India. Mix of English, Hindi, and Hinglish. Hindi words in Roman script.');
+  formData.append('response_format', 'json');
 
-  const resp = await fetch('https://oauth2.googleapis.com/token', {
+  const resp = await fetch('https://api.groq.com/openai/v1/audio/transcriptions', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: `grant_type=urn%3Aietf%3Aparams%3Aoauth%3Agrant-type%3Ajwt-bearer&assertion=${jwt}`,
+    headers: { 'Authorization': `Bearer ${groqApiKey}` },
+    body: formData,
   });
 
   const data = await resp.json();
-  if (!data.access_token) throw new Error(`GCP token error: ${JSON.stringify(data)}`);
 
-  _gcpToken       = data.access_token;
-  _gcpTokenExpiry = now + 3600;
-  return _gcpToken;
+  // Transform to SpeechResponse format (matches the Android model class)
+  return Response.json({
+    results: [{
+      alternatives: [{
+        transcript: data.text ?? '',
+        confidence: 1.0,
+      }],
+    }],
+  }, { status: resp.ok ? 200 : resp.status });
 }
 
-async function buildJwt(clientEmail, privateKeyPem, now) {
-  const header  = b64url(JSON.stringify({ alg: 'RS256', typ: 'JWT' }));
-  const payload = b64url(JSON.stringify({
-    iss: clientEmail,
-    scope: 'https://www.googleapis.com/auth/cloud-platform',
-    aud: 'https://oauth2.googleapis.com/token',
-    iat: now,
-    exp: now + 3600,
-  }));
-  const signingInput = `${header}.${payload}`;
-  const key = await importPrivateKey(privateKeyPem);
-  const sig = await crypto.subtle.sign(
-    'RSASSA-PKCS1-v1_5', key, new TextEncoder().encode(signingInput)
-  );
-  return `${signingInput}.${b64url(sig)}`;
-}
+// ── LLM analysis (Groq — llama-3.3-70b-versatile) ────────────────────────────
 
-async function importPrivateKey(pem) {
-  const der = pemToDer(pem);
-  return crypto.subtle.importKey(
-    'pkcs8', der,
-    { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' },
-    false, ['sign']
-  );
-}
-
-function pemToDer(pem) {
-  const b64 = pem.replace(/-----[^-]+-----/g, '').replace(/\s/g, '');
-  const bin = atob(b64);
-  const buf = new Uint8Array(bin.length);
-  for (let i = 0; i < bin.length; i++) buf[i] = bin.charCodeAt(i);
-  return buf.buffer;
-}
-
-function b64url(data) {
-  const str = typeof data === 'string'
-    ? btoa(data)
-    : btoa(String.fromCharCode(...new Uint8Array(data)));
-  return str.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
-}
-
-// ── Speech-to-Text ────────────────────────────────────────────────────────────
-
-async function transcribe(body, gcpToken) {
-  const resp = await fetch('https://speech.googleapis.com/v1p1beta1/speech:recognize', {
+async function chat(body, groqApiKey) {
+  const resp = await fetch('https://api.groq.com/openai/v1/chat/completions', {
     method: 'POST',
     headers: {
-      'Authorization': `Bearer ${gcpToken}`,
+      'Authorization': `Bearer ${groqApiKey}`,
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
-      config: {
-        encoding: 'LINEAR16',
-        sampleRateHertz: 16000,
-        languageCode: 'en-IN',
-        alternativeLanguageCodes: ['hi-IN'],
-        model: 'latest_long',
-        enableAutomaticPunctuation: true,
-      },
-      audio: { content: body.audio },
+      model: 'llama-3.3-70b-versatile',
+      messages: [{ role: 'user', content: body.prompt }],
+      max_tokens: body.maxTokens ?? 4096,
     }),
   });
-  return new Response(resp.body, {
-    status: resp.status,
-    headers: { 'Content-Type': 'application/json' },
-  });
+
+  const data = await resp.json();
+  const text  = data.choices?.[0]?.message?.content ?? '';
+  const usage = data.usage ?? {};
+
+  // Transform to Gemini format (matches GeminiResponse in Android)
+  return Response.json({
+    candidates: [{
+      content: {
+        role: 'model',
+        parts: [{ text }],
+      },
+    }],
+    usageMetadata: {
+      promptTokenCount:     usage.prompt_tokens     ?? 0,
+      candidatesTokenCount: usage.completion_tokens ?? 0,
+    },
+  }, { status: resp.ok ? 200 : resp.status });
 }
 
-// ── Vertex AI Gemini ──────────────────────────────────────────────────────────
+// ── Helpers ───────────────────────────────────────────────────────────────────
 
-async function gemini(body, gcpToken, env) {
-  const sa  = JSON.parse(env.SERVICE_ACCOUNT_JSON);
-  const url = `https://us-central1-aiplatform.googleapis.com/v1/projects/${sa.project_id}`
-    + `/locations/us-central1/publishers/google/models/gemini-2.5-flash:generateContent`;
-
-  const resp = await fetch(url, {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${gcpToken}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      contents: [{ role: 'user', parts: [{ text: body.prompt }] }],
-      generationConfig: {
-        maxOutputTokens: body.maxTokens ?? 4096,
-        thinkingConfig: { thinkingBudget: 0 },
-      },
-    }),
-  });
-  return new Response(resp.body, {
-    status: resp.status,
-    headers: { 'Content-Type': 'application/json' },
-  });
+function base64ToBytes(b64) {
+  const binary = atob(b64);
+  const bytes  = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+  return bytes.buffer;
 }

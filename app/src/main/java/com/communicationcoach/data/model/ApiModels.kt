@@ -41,7 +41,7 @@ data class SpeechAlternative(
     val confidence: Float = 0f
 )
 
-// ── Vertex AI Gemini ──────────────────────────────────────────────────────────
+// ── Groq LLM response (shaped like Gemini for compatibility) ─────────────────
 
 data class GeminiRequest(
     val contents: List<GeminiContent>,

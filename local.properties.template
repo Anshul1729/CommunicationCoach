@@ -4,7 +4,9 @@
 # Android SDK path
 sdk.dir=/path/to/your/Android/sdk
 
-# Google Cloud project config (Vertex AI)
-GCP_PROJECT_ID=your-gcp-project-id
-VERTEX_REGION=us-central1
-GEMINI_MODEL=gemini-2.5-flash
+# Your deployed Cloudflare Worker URL (e.g. https://communication-coach-proxy.<name>.workers.dev)
+WORKER_URL=https://your-worker.workers.dev
+
+# Random secret shared between the app and your Cloudflare Worker
+# Generate one with: openssl rand -hex 32
+APP_TOKEN=your-app-token-here

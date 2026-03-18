@@ -12,12 +12,13 @@ class CostTracker(context: Context) {
         // Set to 2.0 for friend/guest build ($2 cap).
         const val SPEND_LIMIT_USD = Double.MAX_VALUE
 
-        // Google Cloud Speech-to-Text: latest_long model — $0.006 per 15-second block
-        private const val STT_COST_PER_15S = 0.006
+        // Groq Whisper large-v3 — $0.111/hour = $0.001850/minute = ~$0.000463 per 15-second block
+        // Free tier: 7,200 seconds/day (2 hours). Above that, paid pricing applies.
+        private const val STT_COST_PER_15S = 0.000463
 
-        // Vertex AI Gemini 2.5 Flash
-        private const val GEMINI_INPUT_PER_1M  = 0.075   // $0.075 per 1M input tokens
-        private const val GEMINI_OUTPUT_PER_1M = 0.30    // $0.30 per 1M output tokens
+        // Groq llama-3.3-70b-versatile (paid tier pricing — free tier costs $0)
+        private const val GEMINI_INPUT_PER_1M  = 0.59    // $0.59 per 1M input tokens
+        private const val GEMINI_OUTPUT_PER_1M = 0.79    // $0.79 per 1M output tokens
 
         private const val KEY_STT_USD          = "stt_usd"
         private const val KEY_GEMINI_USD       = "gemini_usd"

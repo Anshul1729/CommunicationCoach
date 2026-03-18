@@ -39,9 +39,8 @@ class ApiClient(context: Context) {
     // ── Transcription ─────────────────────────────────────────────────────────
 
     suspend fun transcribeAudio(file: File): Response<SpeechResponse> {
-        // Strip 44-byte WAV header → raw LINEAR16 PCM
-        val pcmBytes = file.readBytes().drop(44).toByteArray()
-        val base64Audio = Base64.encodeToString(pcmBytes, Base64.NO_WRAP)
+        // Send the full WAV file — Groq Whisper needs the header to identify the format
+        val base64Audio = Base64.encodeToString(file.readBytes(), Base64.NO_WRAP)
         return workerService.transcribe(auth, WorkerTranscribeRequest(audio = base64Audio))
     }
 

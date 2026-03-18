@@ -332,7 +332,7 @@ private fun SpendCard(spend: SpendData) {
             )
             Spacer(Modifier.height(4.dp))
             Text(
-                text = "Vertex AI usage since install",
+                text = "Groq usage since install",
                 fontSize = 12.sp,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
