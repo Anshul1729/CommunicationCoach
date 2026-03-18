@@ -103,7 +103,7 @@ fun ProfileScreen(
                             )
                             Spacer(Modifier.height(8.dp))
                             Text(
-                                text = "After a few analyzed conversations, Gemini will start recognizing your patterns and building your coaching profile here.",
+                                text = "After a few analyzed conversations, the app will start recognizing your patterns and building your coaching profile here.",
                                 fontSize = 14.sp,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 textAlign = TextAlign.Center,
@@ -338,10 +338,10 @@ private fun SpendCard(spend: SpendData) {
             )
             Spacer(Modifier.height(16.dp))
 
-            SpendRow(label = "Speech-to-Text", value = "$${"%,.4f".format(spend.sttUsd)}")
+            SpendRow(label = "Groq Whisper", value = "$${"%,.4f".format(spend.sttUsd)}")
             Spacer(Modifier.height(8.dp))
             SpendRow(
-                label = "Gemini 2.5 Flash",
+                label = "Groq Llama 3.3 70B",
                 value = "$${"%,.4f".format(spend.geminiUsd)}",
                 subtitle = if (spend.geminiInputTokens > 0)
                     "${"%,d".format(spend.geminiInputTokens)} in · ${"%,d".format(spend.geminiOutputTokens)} out tokens"

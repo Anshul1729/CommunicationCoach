@@ -8,7 +8,7 @@ import java.io.File
 data class WorkerTranscribeRequest(val audio: String)
 data class WorkerGeminiRequest(val prompt: String, val maxTokens: Int)
 
-// ── Google Speech-to-Text ─────────────────────────────────────────────────────
+// ── Speech transcription response (SpeechResponse) ───────────────────────────
 
 data class SpeechRequest(
     val config: SpeechConfig,
